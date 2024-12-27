@@ -12,13 +12,27 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { signupValidation } from "@/lib/validation";
-import { Link } from "react-router-dom";
+import { signinValidation } from "@/lib/validation";
+import Loader from "@/components/shared/Loader";
+import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import {
+  useSignInAccount,
+} from "@/lib/react-query/queries";
+import { useUserContext } from "@/context/AuthContext";
 
-const SigninForm = () => {
+
+const SignInForm = () => {
+  const { toast } = useToast();
+  const { checkAuthUser, isLoading: isUserLoading } = useUserContext();
+  const navigate = useNavigate();
+
+  const { mutateAsync: signInAccount, isPending: isSigningIn } =
+    useSignInAccount();
+
   // 1. Define your form.
-  const form = useForm<z.infer<typeof signupValidation>>({
-    resolver: zodResolver(signupValidation),
+  const form = useForm<z.infer<typeof signinValidation>>({
+    resolver: zodResolver(signinValidation),
     defaultValues: {
       email: "",
       password: "",
@@ -26,10 +40,43 @@ const SigninForm = () => {
   });
 
   // 2. Define a submit handler.
-  function onSubmit(values: z.infer<typeof signupValidation>) {
+  async function onSubmit(values: z.infer<typeof signinValidation>) {
     // Do something with the form values.
     // ✅ This will be type-safe and validated.
-    console.log(values);
+
+    try {
+
+      const session = await signInAccount({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (!session) {
+        toast({
+          title: "Sign in failed. Please try again later",
+        });
+
+        navigate("/sign-in");
+
+        return;
+      }
+
+      const isLoggedIn = await checkAuthUser();
+
+      if (isLoggedIn) {
+        form.reset();
+        navigate("/");
+      } else {
+        toast({ title: "Login failed. Please try again." });
+
+        return;
+      }
+    } catch (error) {
+      console.log(error);
+      toast({
+        title: "Error occurred. Please try again later",
+      });
+    }
   }
 
   return (
@@ -40,7 +87,7 @@ const SigninForm = () => {
           Create a new account
         </h2>
         <p className="text-light-3 small-medium md:base-regular mt-2">
-          To use snapgram enter your details
+          Welcome back! please enter your details
         </p>
 
         <form
@@ -74,7 +121,15 @@ const SigninForm = () => {
               </FormItem>
             )}
           />
-          <Button type="submit">Log In</Button>
+          <Button className="shad-button_primary" type="submit">
+            {isUserLoading || isSigningIn ? (
+              <div className="flex-center gap-2">
+                <Loader /> Loading...
+              </div>
+            ) : (
+              "Sign In"
+            )}
+          </Button>
         </form>
       </div>
 
@@ -91,4 +146,4 @@ const SigninForm = () => {
   );
 };
 
-export default SigninForm;
+export default SignInForm;
